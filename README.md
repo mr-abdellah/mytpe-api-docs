@@ -83,47 +83,15 @@ Save the `id` from the response (this is your `bank_account_id`).
 
 ---
 
-### Step 5: Check Account Setup
+### Step 5: Get Your Brand ID
 
-Verify everything is in place before creating a MytpePay instance.
+The brand was auto-created in Step 2 with the same name as your `raison_sociale`. Its `registre_commerce_id` matches your identification ID.
 
-```
-GET /trader/mytpe-pay/check-account
-```
-
-Expected response:
-
-```json
-{
-  "has_valid_identification": true,
-  "has_valid_brand": true,
-  "has_valid_bank_account": true
-}
-```
-
-All three must be `true`. Since the brand was auto-created in Step 2 and pending resources are accepted, this should pass right away.
+You need the brand `id` to create a MytpePay instance. You can find it by listing your brands or through your identification data.
 
 ---
 
-### Step 6: Get Your Brand ID
-
-```
-GET /trader/RegistreCommerce
-```
-
-Look at the identification from Step 3. Use its `id` to find the associated brand, or list brands separately. The brand was auto-created with the same name as your `raison_sociale`.
-
-You can also find it via:
-
-```
-GET /trader/mytpe-pay/check-account
-```
-
-Or query brands directly if an endpoint is available. The brand's `registre_commerce_id` matches your identification ID.
-
----
-
-### Step 7: Create MytpePay Instance
+### Step 6: Create MytpePay Instance
 
 ```
 POST /trader/mytpe-pay/store
@@ -144,7 +112,7 @@ The instance is created in `pending` status. Save the instance `id`.
 
 ---
 
-### Step 8: Pay Activation Fee
+### Step 7: Pay Activation Fee
 
 Check the price first:
 
@@ -181,7 +149,7 @@ After payment, the instance moves to `processing` → admin reviews → `active`
 
 ---
 
-### Step 9: Create Payment Links
+### Step 8: Create Payment Links
 
 Once your instance is `active`, create payment links that your clients can use.
 
@@ -228,13 +196,12 @@ Your clients can now pay at: `https://mytpe.app/pay/{slug}`
 | 2 | `POST /trader/RegistreCommerce/store` | Create identification + brand (auto) |
 | 3 | `GET /trader/RegistreCommerce` | Get identification ID |
 | 4 | `POST /trader/BankAccount/store` | Link bank account |
-| 5 | `GET /trader/mytpe-pay/check-account` | Verify setup (all 3 = true) |
-| 6 | — | Get brand ID (auto-created in step 2) |
-| 7 | `POST /trader/mytpe-pay/store` | Create MytpePay instance |
-| 8 | `POST /trader/mytpe-pay/{id}/pay` | Pay activation fee |
-| 9 | `POST /trader/mytpe-pay/links/store` | Create payment links |
+| 5 | — | Get brand ID (auto-created in step 2) |
+| 6 | `POST /trader/mytpe-pay/store` | Create MytpePay instance |
+| 7 | `POST /trader/mytpe-pay/{id}/pay` | Pay activation fee |
+| 8 | `POST /trader/mytpe-pay/links/store` | Create payment links |
 
-> **No waiting required between steps 2–7.** Identification, brand, and bank account can all be pending. Admin approval happens in the background. You only need to wait for the instance to become `active` (after payment + admin review) before creating payment links.
+> **No waiting required between steps 2–6.** Identification, brand, and bank account can all be pending. Admin approval happens in the background. You only need to wait for the instance to become `active` (after payment + admin review) before creating payment links.
 
 ---
 
