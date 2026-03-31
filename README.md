@@ -4,6 +4,240 @@ Base URL: `https://bank.mytpe.app/api`
 
 ---
 
+## Quick Start — Notaire Workflow
+
+This is the step-by-step guide to go from zero to accepting payments as a notaire.
+
+### Step 1: Register
+
+```
+POST /trader/signup
+```
+
+```json
+{
+  "full_name": "Maître Ahmed Benali",
+  "email": "ahmed@cabinet-benali.dz",
+  "password": "securePassword123",
+  "password_confirmation": "securePassword123",
+  "phone": "0555000000"
+}
+```
+
+Save the `token` from the response. Use it as `Authorization: Bearer {token}` in all following requests.
+
+---
+
+### Step 2: Create Identification
+
+This creates your notary office identity. A **brand is automatically created** for you (using your `raison_sociale` as the brand name).
+
+```
+POST /trader/RegistreCommerce/store
+```
+
+```
+Content-Type: multipart/form-data
+
+raison_sociale: "Cabinet Notarial Benali"
+type_etablissement: "profession_liberale"
+type_autorisation_liberale: "notary"
+activite_id: 1
+identification_file: (optional PDF, max 5MB)
+```
+
+> You now have an identification + a brand, both in `pending` status. No need to wait for admin approval to continue.
+
+---
+
+### Step 3: Get Your Identification ID
+
+You need the identification ID to create a bank account.
+
+```
+GET /trader/RegistreCommerce
+```
+
+Save the `id` from the response (this is your `registre_commerce_id`).
+
+---
+
+### Step 4: Create Bank Account
+
+Link your RIB (20-digit Algerian bank account number) to your identification.
+
+```
+POST /trader/BankAccount/store
+```
+
+```json
+{
+  "rib": "00299999000000001234",
+  "registre_commerce_id": "your-identification-id"
+}
+```
+
+Save the `id` from the response (this is your `bank_account_id`).
+
+> You can validate your RIB first with `POST /trader/rib-bank` (optional).
+
+---
+
+### Step 5: Check Account Setup
+
+Verify everything is in place before creating a MytpePay instance.
+
+```
+GET /trader/mytpe-pay/check-account
+```
+
+Expected response:
+
+```json
+{
+  "has_valid_identification": true,
+  "has_valid_brand": true,
+  "has_valid_bank_account": true
+}
+```
+
+All three must be `true`. Since the brand was auto-created in Step 2 and pending resources are accepted, this should pass right away.
+
+---
+
+### Step 6: Get Your Brand ID
+
+```
+GET /trader/RegistreCommerce
+```
+
+Look at the identification from Step 3. Use its `id` to find the associated brand, or list brands separately. The brand was auto-created with the same name as your `raison_sociale`.
+
+You can also find it via:
+
+```
+GET /trader/mytpe-pay/check-account
+```
+
+Or query brands directly if an endpoint is available. The brand's `registre_commerce_id` matches your identification ID.
+
+---
+
+### Step 7: Create MytpePay Instance
+
+```
+POST /trader/mytpe-pay/store
+```
+
+```
+Content-Type: multipart/form-data
+
+name: "Paiements Cabinet Benali"
+description: "Accepter les paiements pour les services notariaux"
+logo: (optional image, jpg/png, max 2MB)
+registre_commerce_id: "your-identification-id"
+bank_account_id: "your-bank-account-id"
+brand_id: "your-brand-id"
+```
+
+The instance is created in `pending` status. Save the instance `id`.
+
+---
+
+### Step 8: Pay Activation Fee
+
+Check the price first:
+
+```
+GET /trader/mytpe-pay/price
+```
+
+Then pay using one of three methods:
+
+**Option A — Online payment:**
+```
+POST /trader/mytpe-pay/{instance-id}/pay
+```
+→ Redirects to payment gateway. After payment, check status with `POST /trader/mytpe-pay/transaction/fetch`.
+
+**Option B — Cheque:**
+```
+POST /trader/mytpe-pay/{instance-id}/pay/cheque
+```
+```
+cheque_number: "123456"
+payment_doc: (optional file)
+```
+
+**Option C — Bank transfer:**
+```
+POST /trader/mytpe-pay/{instance-id}/pay/bank-transfer
+```
+```
+payment_doc: (required file, proof of transfer)
+```
+
+After payment, the instance moves to `processing` → admin reviews → `active`.
+
+---
+
+### Step 9: Create Payment Links
+
+Once your instance is `active`, create payment links that your clients can use.
+
+```
+POST /trader/mytpe-pay/links/store
+```
+
+**Fixed amount link (e.g. notary fee of 5000 DA):**
+
+```json
+{
+  "mytpe_pay_id": "your-instance-id",
+  "title": "Frais d'authentification",
+  "details": "Paiement pour service d'authentification notariale",
+  "type": "dynamic",
+  "amount": 5000,
+  "slug": "authentification-benali",
+  "payment_mode": "reusable"
+}
+```
+
+**Open amount link (client enters the amount):**
+
+```json
+{
+  "mytpe_pay_id": "your-instance-id",
+  "title": "Paiement libre",
+  "details": "Paiement pour services notariaux",
+  "type": "static",
+  "slug": "paiement-benali",
+  "payment_mode": "reusable"
+}
+```
+
+Your clients can now pay at: `https://mytpe.app/pay/{slug}`
+
+---
+
+### Summary
+
+| Step | Endpoint | What happens |
+|------|----------|-------------|
+| 1 | `POST /trader/signup` | Create account, get token |
+| 2 | `POST /trader/RegistreCommerce/store` | Create identification + brand (auto) |
+| 3 | `GET /trader/RegistreCommerce` | Get identification ID |
+| 4 | `POST /trader/BankAccount/store` | Link bank account |
+| 5 | `GET /trader/mytpe-pay/check-account` | Verify setup (all 3 = true) |
+| 6 | — | Get brand ID (auto-created in step 2) |
+| 7 | `POST /trader/mytpe-pay/store` | Create MytpePay instance |
+| 8 | `POST /trader/mytpe-pay/{id}/pay` | Pay activation fee |
+| 9 | `POST /trader/mytpe-pay/links/store` | Create payment links |
+
+> **No waiting required between steps 2–7.** Identification, brand, and bank account can all be pending. Admin approval happens in the background. You only need to wait for the instance to become `active` (after payment + admin review) before creating payment links.
+
+---
+
 ## 1. Authentication
 
 ### 1.1 Login
